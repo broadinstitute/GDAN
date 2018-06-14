@@ -74,7 +74,8 @@ def main():
 
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter,
                             description='''
-    Create a new data analyses workspace, named analyses__YYYY_MM_DD.
+    Create a new data analyses workspace, named analyses__YYYY_MM_DD or
+    awg_<cohort>__YYYY_MM_DD.
     The space will be populated with the appropriate tumor subtypes from the
     associated stddata run and the analyses method configs, from which the
     sample set analysis pipelines will be executed.''')
