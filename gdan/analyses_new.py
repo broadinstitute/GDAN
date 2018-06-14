@@ -67,7 +67,7 @@ def remove_suffix(sset_name):
         return '-'.join(name_fields[:-1])
     return sset_name
 
-def main(args):
+def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s::%(levelname)s  %(message)s',
                         datefmt='%Y-%m-%d %I:%M:%S %p')
