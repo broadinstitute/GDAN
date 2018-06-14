@@ -1,0 +1,16 @@
+digraph "stddata" {
+    "Clinical_Pick_Tier1";
+    "Merge_clinical";
+    "Merge_clinical" -> "Clinical_Pick_Tier1" [ satisfiedMode="OnComplete" ];
+    "Merge_CNV__unfiltered__snp6";
+    "Merge_CNV__snp6";
+    "Merge_SNV__mutect";
+    "Merge_miR__geneExp";
+    "Merge_miR__isoformExp";
+    "Merge_mRNA__geneExp__FPKM";
+    "Merge_mRNA__geneExpNormed__FPKM";
+    "Merge_methylation__HM450";
+    "Merge_methylation__HM27";
+    "mRNA_Preprocess";
+    "Merge_mRNA__geneExpNormed__FPKM" -> "mRNA_Preprocess" [ satisfiedMode="OnComplete" ];
+}
