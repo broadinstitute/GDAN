@@ -63,7 +63,7 @@ def remove_suffix(sset_name):
     """If more than one hyphen in sset_name, remove last hyphen and everything
     after it"""
     name_fields = sset_name.split('-')
-    if len(name_fields > 2):
+    if len(name_fields) > 2:
         return '-'.join(name_fields[:-1])
     return sset_name
 
