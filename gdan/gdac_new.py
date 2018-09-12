@@ -17,6 +17,7 @@ functionality.
 import os
 import sys
 import logging
+import logging.config
 import subprocess
 import csv
 from argparse import ArgumentParser, FileType
