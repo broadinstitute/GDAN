@@ -18,6 +18,7 @@ import os
 import sys
 import logging
 import subprocess
+import csv
 from argparse import ArgumentParser, FileType
 from getpass import getuser
 from pkg_resources import resource_filename
@@ -35,6 +36,8 @@ def get_configs(workflow):
                 yield config.rstrip(';').strip('"')
 
 def create_workspace(project, workspace):
+    """Creates a new workspace or confirms use of an existing workspace.
+    Returns the workspace name and if the workspace is new"""
     username = getuser()
     logging.info('Checking for %s/%s ...', project, workspace)
     if fissfc('space_exists', '-p', project, '-w', workspace):
@@ -43,6 +46,9 @@ def create_workspace(project, workspace):
                '{} instead'.format(workspace + '__' + username),
                prompt='? [y/N]: '):
             workspace = workspace + '__' + username
+        elif ask('Initialize analyses run in existing workspace ' +
+                 '{}/{}'.format(project, workspace), prompt='? [y/N]: '):
+            return workspace, False
         else:
             workspace = input(workspace + ' already exists in ' + project +
                               '. Please create a unique workspace name: ')
@@ -53,7 +59,7 @@ def create_workspace(project, workspace):
     fissfc('space_new', '-p', project, '-w', workspace)
     
     # Workspace name may have been modified, so return the final version
-    return workspace
+    return workspace, True
 
 def set_acl(role, args):
     attr = getattr(args, role.lower() + 's')
@@ -63,7 +69,28 @@ def set_acl(role, args):
         logging.info('Adding %s as workspace %s(s)', ', '.join(attr), role)
         space_set_acl(args)
 
+def get_ssets(sset_loadfile):
+    with open(sset_loadfile) as ssets:
+        ssets.next()
+        return sorted(set(line.strip().split("\t")[0] for line in ssets))
+
+def load_attributes(attributes):
+    attr_reader = csv.DictReader(attributes, dialect='excel-tab')
+    attr_dict = dict()
+    for row in attr_reader:
+        attr_dict[row[attr_reader.fieldnames[0]]] = \
+                    {field: row[field] for field in attr_reader.fieldnames[1:]}
+    attributes.close()
+    return attr_dict
+
 def main():
+    workflow = resource_filename(__name__,
+                                 os.path.join('defaults', 'stddata.dot'))
+    
+    analyses_wf = resource_filename(__name__,
+                                    os.path.join('defaults', 'Analyses.dot'))
+    
+    fail_msg = "Failed, see log output for details."
     
     parser = ArgumentParser(description="""
     Create given project/workspace. Loads default attributes and ACLs.
@@ -96,12 +123,11 @@ def main():
     parser.add_argument('cohort', help='Name of the tumor cohort ' +
                         '(e.g. TCGA-LUAD, TCGA-STES, CPTAC3-UCEC, etc.). ' +
                         'This should match the root names of your loadfiles')
-    parser.add_argument('-f', '--workflow',
-                        default=resource_filename(__name__,
-                                                  os.path.join('defaults',
-                                                               'gdan.dot')),
-                        help='DOT file specifying the workflow containing ' +
-                             'the methods (default: %(default)s).')
+    parser.add_argument('-e', '--entities', metavar='ENTITY', nargs='*',
+                        help='Specify which entities to run analyses ' +
+                        'workflow on. Only set this for an existing ' +
+                        'workspace on which the stddata workflow has ' +
+                        'completed')
     parser.add_argument('-a', '--attributes', type=FileType('r'),
                         default=resource_filename(__name__,
                                                   os.path.join('defaults',
@@ -119,53 +145,77 @@ def main():
         log_kwargs['format']   = '%(asctime)s::%(levelname)-8s %(message)s'
         log_kwargs['datefmt']  = '%Y-%m-%d %H:%M:%S'
     logging.basicConfig(**log_kwargs)
-    # Confirm loadfiles exist before going any further
-    loadfiles = dict(zip(['participants', 'samples', 'sample_sets'],
-                         [args.cohort + etype + '.loadfile.txt' for etype in 
-                          ('.Participants', '.Samples', '.SampleSet')]))
-    
-    for loadfile in loadfiles.values():
-        if not os.path.isfile(loadfile):
-            logging.error("Loadfile not found: %s. Exiting.", loadfile)
-            sys.exit(1)
     
     fromproject, fromspace = args.methods.split('/')
     if args.workspace is None:
         args.workspace = 'awg_' + args.cohort
     
-    args.workspace = create_workspace(args.project, args.workspace)
-    
-    # Add ACLs
-    set_acl('owner', args)
-    set_acl('reader', args)
-    set_acl('writer', args)
-    
-    # Set args.workspace annotations
-    logging.info('Setting package to "true"')
-    fissfc('-y', 'attr_set', '-p', args.project, '-w', args.workspace, '-a', 'package',
-           '-v', 'true')
+    args.workspace, new = create_workspace(args.project, args.workspace)
+    done_msg = ''
+    if new:
+        logging.info('Initializing stddata run.')
+        # Confirm loadfiles exist before going any further
+        loadfiles = dict(zip(['participants', 'samples', 'sample_sets'],
+                             [args.cohort + etype + '.loadfile.txt' for etype in 
+                              ('.Participants', '.Samples', '.SampleSet')]))
+        
+        for loadfile in loadfiles.values():
+            if not os.path.isfile(loadfile):
+                logging.error("Loadfile not found: %s. Exiting.", loadfile)
+                sys.exit(fail_msg)
+        
+        ssets = get_ssets(loadfiles['sample_sets'])
+        
+        done_msg = 're-run by populating the --entities option with any ' + \
+                   'of the following Sample Sets:\n\t' + '\n\t'.join(ssets)
+        # Add ACLs
+        set_acl('owner', args)
+        set_acl('reader', args)
+        set_acl('writer', args)
+        
+        # Set args.workspace annotations
+        logging.info('Setting package to "true"')
+        fissfc('-y', 'attr_set', '-p', args.project, '-w', args.workspace, '-a', 'package',
+               '-v', 'true')
+        
+        # Load Entities
+        logging.info('Loading Participants')
+        fissfc('entity_import', '-p', args.project, '-w', args.workspace,
+               '-f', loadfiles['participants'])
+        
+        logging.info('Loading Samples')
+        fissfc('entity_import', '-p', args.project, '-w', args.workspace,
+               '-f', loadfiles['samples'])
+        
+        logging.info('Loading Sample Sets')
+        fissfc('entity_import', '-p', args.project, '-w', args.workspace,
+               '-f', loadfiles['sample_sets'])
+        
+    elif args.entities:
+        logging.info('Initializing analyses run.')
+        workflow = analyses_wf
+        # load custom sset attributes
+        attributes = load_attributes(args.attributes)
+        for sset in args.entities:
+            if sset in attributes:
+                for attr, value in attributes[sset].items():
+                    fissfc("attr_set", "-t", "sample_set", "-e", sset,
+                           "-a", attr, "-v", value, "-w", args.workspace,
+                           "-p", args.project)
+    else:
+        logging.error("To use an existing workspace, please specify the " +
+                      "Sample Set(s) to run analyses on via the '--entities'" +
+                      " option")
+        sys.exit(fail_msg)
     
     # Copy method configs
     logging.info('Copying method configs from %s to %s/%s', args.methods,
                  args.project, args.workspace)
     
-    for config in get_configs(args.workflow):
+    for config in get_configs(workflow):
         fissfc('config_copy', '-c', config, '-n', args.namespace,
                '-p', fromproject, '-s', fromspace, '-P', args.project,
                '-S', args.workspace)
-    
-    # Load Entities
-    logging.info('Loading Participants')
-    fissfc('entity_import', '-p', args.project, '-w', args.workspace,
-           '-f', loadfiles['participants'])
-    
-    logging.info('Loading Samples')
-    fissfc('entity_import', '-p', args.project, '-w', args.workspace,
-           '-f', loadfiles['samples'])
-    
-    logging.info('Loading Sample Sets')
-    fissfc('entity_import', '-p', args.project, '-w', args.workspace,
-           '-f', loadfiles['sample_sets'])
     
     # Initiate supervisor mode
     recover = args.workspace + '.json'
@@ -183,12 +233,31 @@ def main():
             cron_cmd[-1] = '"{}"'.format(cron_cmd[-1])
             if cpe.output:
                 logging.warning(cpe.output)
-            logging.warning('Failed to add Dashboard cron job. Please run \n' +
+            logging.warning('Failed to add Dashboard cron job. Please run\n' +
                             '\t{}\n'.format(' '.join(cron_cmd)) +
                             'from a CGA server')
     
-    fissfc('-y', 'supervise', '-p', args.project, '-w', args.workspace,
-           '-n', args.namespace, '-j', recover, args.workflow)
+    try:
+        supervise_args = ['-y', 'supervise', '-p', args.project, '-w', \
+                          args.workspace, '-n', args.namespace]
+        if args.entities:
+            supervise_args += ['-s'] + args.entities
+        supervise_args += ['-j', recover, workflow]
+        fissfc(*supervise_args)
+    except:
+        logging.exception('Supervisor failed, please check nature of failure' +
+                          ' and run\n\tfissfc supervise_recover ' + recover +
+                          '\nif appropriate.')
+        if new:
+            logging.info('Once successful, %s\n to begin analyses.', done_msg)
+        sys.exit(fail_msg)
+    
+    if new:
+        logging.info('Successfully completed stddata run. To begin analyses,' +
+                     ' %s', done_msg)
+    else:
+        logging.info('Analyses complete!')
+    
 
 if __name__ == '__main__':
     main()
