@@ -229,7 +229,7 @@ def main():
         for sset in args.entities:
             if sset in attributes:
                 for attr, value in attributes[sset].items():
-                    fissfc("attr_set", "-t", "sample_set", "-e", sset,
+                    fissfc('-y', "attr_set", "-t", "sample_set", "-e", sset,
                            "-a", attr, "-v", value, "-w", args.workspace,
                            "-p", args.project)
     else:
