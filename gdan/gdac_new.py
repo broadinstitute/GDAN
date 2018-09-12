@@ -138,13 +138,42 @@ def main():
     parser.add_argument('-l', '--logfile', help='Write logging output to file')
     args = parser.parse_args()
     
-    log_kwargs = {'level'  : logging.INFO,
-                  'format' : '%(levelname)-8s %(message)s'}
+    # fiss.supervisor sets the root logger rather than using its own, the below
+    # method overrides those settings
+    log_cfg = dict(
+        version=1,
+        formatters={
+            'short': {
+                'format': '%(levelname)-8s %(message)s'
+            },
+            'long': {
+                'format': '%(asctime)s::%(levelname)-8s %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S'
+            }
+        },
+        handlers={
+            'console': {
+                'level': 'INFO',
+                'formatter': 'short',
+                'class': 'logging.StreamHandler'
+            }
+        },
+        root={
+            'level': 'INFO',
+            'handlers': ['console']
+        }
+    )
+                        
     if args.logfile is not None:
-        log_kwargs['filename'] = args.logfile
-        log_kwargs['format']   = '%(asctime)s::%(levelname)-8s %(message)s'
-        log_kwargs['datefmt']  = '%Y-%m-%d %H:%M:%S'
-    logging.basicConfig(**log_kwargs)
+        log_cfg['handlers']['file'] = {
+            'level': 'INFO',
+            'formatter': 'long',
+            'class': 'logging.FileHandler',
+            'filename': args.logfile
+        }
+        log_cfg['root']['handlers'].append('file')
+        
+    logging.config.dictConfig(log_cfg)
     
     fromproject, fromspace = args.methods.split('/')
     if args.workspace is None:
