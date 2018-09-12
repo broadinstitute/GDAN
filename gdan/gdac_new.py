@@ -43,7 +43,7 @@ def create_workspace(project, workspace):
     logging.info('Checking for %s/%s ...', project, workspace)
     if fissfc('space_exists', '-p', project, '-w', workspace):
         if not workspace.endswith(username) and \
-           ask('{}/{}'.format(project, workspace) + 'already exists, use ' +
+           ask('{}/{}'.format(project, workspace) + ' already exists, use ' +
                '{} instead'.format(workspace + '__' + username),
                prompt='? [y/N]: '):
             workspace = workspace + '__' + username
