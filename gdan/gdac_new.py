@@ -225,6 +225,7 @@ def main():
         logging.info('Initializing analyses run.')
         workflow = analyses_wf
         # load custom sset attributes
+        logging.info("Adding attributes to Sample Sets")
         attributes = load_attributes(args.attributes)
         for sset in args.entities:
             if sset in attributes:
