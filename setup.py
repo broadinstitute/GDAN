@@ -16,7 +16,8 @@ setup(
     entry_points = {
         'console_scripts': [
             'analyses_new = gdan.analyses_new:main',
-            'stddata_new = gdan.stddata_new:main'
+            'stddata_new = gdan.stddata_new:main',
+            'gdac_new = gdan.gdac_new:main'
         ]
     },
     package_data = {'gdan': ['defaults/*']},
