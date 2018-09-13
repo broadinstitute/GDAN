@@ -257,8 +257,8 @@ def main():
         logging.info('Initiating dashboard generation cron job')
         try:
             cron_cmd = ['gdac_cron', 'awg', 'add', '-c',
-                        'gdac_dashboard ' + args.workspace]
-            subprocess.check_output(cron_cmd, stderr=subprocess.STDOUT)
+                        'gdac_dashboard -D {} {}'.format(os.getcwd(), args.workspace)]
+            logging.info(subprocess.check_output(cron_cmd, stderr=subprocess.STDOUT))
         except subprocess.CalledProcessError as cpe:
             cron_cmd[-1] = '"{}"'.format(cron_cmd[-1])
             if cpe.output:
