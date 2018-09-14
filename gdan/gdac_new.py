@@ -105,9 +105,9 @@ def main():
                         help='Method Config namespace (default: %(default)s).')
     parser.add_argument('-o', '--owners', metavar='OWNER', nargs='*',
                         default=['GROUP_broadgdac@firecloud.org'],
-                        help='Additional workspace owner(s).')
+                        help='Additional workspace owner(s) (default: %(default)s).')
     parser.add_argument('-r', '--readers', metavar='READER', nargs='*',
-                        default=['Getz_Lab@firecloud.org'],
+                        default=['broadgdac_read_only@firecloud.org'],
                         help='Workspace reader(s) (default: %(default)s).')
     parser.add_argument('-w', '--writers', metavar='WRITER', nargs='*',
                         help='Workspace writer(s).')
